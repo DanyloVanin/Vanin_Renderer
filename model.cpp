@@ -5,7 +5,7 @@
 #include <vector>
 #include "model.h"
 
-Model::Model(const char *filename) : verts_(), faces_() {
+Model::Model(const char *filename) : verts_(), faces_(), tidx_() {
     std::ifstream in;
     in.open (filename, std::ifstream::in);
     if (in.fail()) return;
@@ -21,13 +21,22 @@ Model::Model(const char *filename) : verts_(), faces_() {
             verts_.push_back(v);
         } else if (!line.compare(0, 2, "f ")) {
             std::vector<int> f;
-            int itrash, idx;
+            std::vector<int> tidx;
+            int itrash, textidx, idx;
             iss >> trash;
-            while (iss >> idx >> trash >> itrash >> trash >> itrash) {
+            while (iss >> idx >> trash >> textidx >> trash >> itrash) {
                 idx--; // in wavefront obj all indices start at 1, not zero
+                textidx--;
                 f.push_back(idx);
+                tidx.push_back(textidx);
             }
             faces_.push_back(f);
+            tidx_.push_back(tidx);
+        } else if (!line.compare(0, 3, "vt ")) {
+            iss >> trash >> trash; // Skip "vt"
+            Vec2f vt;
+            for (int i = 0; i < 2; i++) iss >> vt.raw[i];
+            vt_.push_back(vt);
         }
     }
     std::cerr << "# v# " << verts_.size() << " f# "  << faces_.size() << std::endl;
@@ -48,6 +57,14 @@ std::vector<int> Model::face(int idx) {
     return faces_[idx];
 }
 
+std::vector<int> Model::tidx(int idx) {
+    return tidx_[idx];
+}
+
 Vec3f Model::vert(int i) {
     return verts_[i];
+}
+
+Vec2f Model::tex(int i) {
+    return vt_[i];
 }
