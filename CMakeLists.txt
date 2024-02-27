@@ -8,4 +8,5 @@ add_executable(Vanin_Renderer main.cpp
         tgaimage.cpp
         model.h
         geometry.h
-        model.cpp)
+        model.cpp
+        geometry.cpp)
