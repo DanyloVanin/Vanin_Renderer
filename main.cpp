@@ -13,7 +13,7 @@ const int depth  = 255;
 Model *model = NULL;
 int *zbuffer = NULL;
 Vec3f light_dir = Vec3f(1,-1,1).normalize();
-Vec3f eye(1,1,3);
+Vec3f eye(1,2,1);
 Vec3f center(0,0,0);
 
 Matrix viewport(int x, int y, int w, int h) {
@@ -26,6 +26,38 @@ Matrix viewport(int x, int y, int w, int h) {
     m[1][1] = h/2.f;
     m[2][2] = depth/2.f;
     return m;
+}
+
+Matrix rotationZ(float degrees) {
+    float radians = degrees * M_PI / 180.0f; // Convert degrees to radians
+    Matrix rot = Matrix::identity(4); // Start with an identity matrix
+
+    rot[0][0] = cos(radians);
+    rot[0][1] = -sin(radians);
+    rot[1][0] = sin(radians);
+    rot[1][1] = cos(radians);
+    // rot[2][2] remains 1 as it is in the identity matrix, no change needed for Z-axis rotation
+    // rot[3][3] remains 1 to preserve homogenous coordinates
+
+    return rot;
+    // For rotation around the X-axis, you would adjust indices [1][1], [1][2], [2][1], and [2][2].
+    // For rotation around the Y-axis, adjust indices [0][0], [0][2], [2][0], and [2][2].
+}
+
+Matrix rotationY(float degrees) {
+    float radians = degrees * M_PI / 180.0f; // Convert degrees to radians
+    Matrix rot = Matrix::identity(4); // Start with an identity matrix
+
+    rot[0][0] = cos(radians);
+    rot[0][2] = -sin(radians);
+    rot[2][0] = sin(radians);
+    rot[2][2] = cos(radians);
+    // rot[2][2] remains 1 as it is in the identity matrix, no change needed for Z-axis rotation
+    // rot[3][3] remains 1 to preserve homogenous coordinates
+
+    return rot;
+    // For rotation around the X-axis, you would adjust indices [1][1], [1][2], [2][1], and [2][2].
+    // For rotation around the Y-axis, adjust indices [0][0], [0][2], [2][0], and [2][2].
 }
 
 Matrix lookat(Vec3f eye, Vec3f center, Vec3f up) {
@@ -66,6 +98,7 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, float ity0, float ity1, float ity2, 
             Vec3i    P = Vec3f(A) +  Vec3f(B-A)*phi;
             Vec2i uvP =     uvA +   (uvB-uvA)*phi;
             float ityP =    ityA  + (ityB-ityA)*phi;
+            ityP*=1.2;
             int idx = P.x+P.y*width;
             if (P.x>=width||P.y>=height||P.x<0||P.y<0) continue;
             if (zbuffer[idx]<P.z) {
@@ -110,7 +143,8 @@ int main(int argc, char** argv) {
             Vec2i uv[3];
             for (int j=0; j<3; j++) {
                 Vec3f v = model->vert(face[j]);
-                screen_coords[j] =  Vec3f(ViewPort*Projection*ModelView*Matrix(v));
+                Matrix rotation = rotationY(90);
+                screen_coords[j] =  Vec3f(ViewPort*Projection*ModelView*rotation*Matrix(v));
                 world_coords[j]  = v;
                 intensity[j] = model->norm(i, j)*light_dir;
                 uv[j] = model->uv(i, j);
@@ -118,7 +152,7 @@ int main(int argc, char** argv) {
             triangle(screen_coords[0], screen_coords[1], screen_coords[2], intensity[0], intensity[1], intensity[2],  uv[0], uv[1], uv[2], image, zbuffer);
         }
         image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-        image.write_tga_file("../output/render_gouraud2.tga");
+        image.write_tga_file("../output/render_gouraud6.tga");
     }
     delete model;
     delete [] zbuffer;
