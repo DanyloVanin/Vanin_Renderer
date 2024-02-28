@@ -1,5 +1,9 @@
-#include <vector>
+#include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <SFML/System.hpp>
 #include <iostream>
+#include <thread> // For std::this_thread::sleep_for
+#include <chrono> // For std::chrono::milliseconds
 #include <cmath>
 #include <limits>
 #include "tgaimage.h"
@@ -13,7 +17,7 @@ const int depth  = 255;
 Model *model = NULL;
 int *zbuffer = NULL;
 Vec3f light_dir = Vec3f(1,-1,1).normalize();
-Vec3f eye(1,2,1);
+Vec3f eye(0,0,2);
 Vec3f center(0,0,0);
 
 Matrix viewport(int x, int y, int w, int h) {
@@ -110,51 +114,136 @@ void triangle(Vec3i t0, Vec3i t1, Vec3i t2, float ity0, float ity1, float ity2, 
     }
 }
 
+//int main(int argc, char** argv) {
+//    if (2==argc) {
+//        model = new Model(argv[1]);
+//    } else {
+//        model = new Model("../obj/african_head/african_head.obj");
+//    }
+//
+//    zbuffer = new int[width*height];
+//    for (int i=0; i<width*height; i++) {
+//        zbuffer[i] = std::numeric_limits<int>::min();
+//    }
+//
+//    { // draw the model
+//        Matrix ModelView  = lookat(eye, center, Vec3f(0,1,0));
+//        Matrix Projection = Matrix::identity(4);
+//        Matrix ViewPort   = viewport(width/8, height/8, width*3/4, height*3/4);
+//        Projection[3][2] = -1.f/(eye-center).norm();
+//
+//        std::cerr << ModelView << std::endl;
+//        std::cerr << Projection << std::endl;
+//        std::cerr << ViewPort << std::endl;
+//        Matrix z = (ViewPort*Projection*ModelView);
+//        std::cerr << z << std::endl;
+//
+//        TGAImage image(width, height, TGAImage::RGB);
+//        for (int i=0; i<model->nfaces(); i++) {
+//            std::vector<int> face = model->face(i);
+//            Vec3i screen_coords[3];
+//            Vec3f world_coords[3];
+//            float intensity[3];
+//            Vec2i uv[3];
+//            for (int j=0; j<3; j++) {
+//                Vec3f v = model->vert(face[j]);
+//                Matrix rotation = rotationY(90);
+//                screen_coords[j] =  Vec3f(ViewPort*Projection*ModelView*rotation*Matrix(v));
+//                world_coords[j]  = v;
+//                intensity[j] = model->norm(i, j)*light_dir;
+//                uv[j] = model->uv(i, j);
+//            }
+//            triangle(screen_coords[0], screen_coords[1], screen_coords[2], intensity[0], intensity[1], intensity[2],  uv[0], uv[1], uv[2], image, zbuffer);
+//        }
+//        image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
+//        image.write_tga_file("../output/render_gouraud6.tga");
+//    }
+//    delete model;
+//    delete [] zbuffer;
+//    return 0;
+//}
+
 int main(int argc, char** argv) {
-    if (2==argc) {
+    if (2 == argc) {
         model = new Model(argv[1]);
     } else {
         model = new Model("../obj/african_head/african_head.obj");
     }
 
-    zbuffer = new int[width*height];
-    for (int i=0; i<width*height; i++) {
-        zbuffer[i] = std::numeric_limits<int>::min();
-    }
+    sf::RenderWindow window(sf::VideoMode(width, height), "Model Rotation");
+    sf::Texture texture;
+    texture.create(width, height);
+    sf::Sprite sprite(texture);
+    sprite.setPosition(0, 0);
 
-    { // draw the model
-        Matrix ModelView  = lookat(eye, center, Vec3f(0,1,0));
-        Matrix Projection = Matrix::identity(4);
-        Matrix ViewPort   = viewport(width/8, height/8, width*3/4, height*3/4);
-        Projection[3][2] = -1.f/(eye-center).norm();
-
-        std::cerr << ModelView << std::endl;
-        std::cerr << Projection << std::endl;
-        std::cerr << ViewPort << std::endl;
-        Matrix z = (ViewPort*Projection*ModelView);
-        std::cerr << z << std::endl;
-
-        TGAImage image(width, height, TGAImage::RGB);
-        for (int i=0; i<model->nfaces(); i++) {
-            std::vector<int> face = model->face(i);
-            Vec3i screen_coords[3];
-            Vec3f world_coords[3];
-            float intensity[3];
-            Vec2i uv[3];
-            for (int j=0; j<3; j++) {
-                Vec3f v = model->vert(face[j]);
-                Matrix rotation = rotationY(90);
-                screen_coords[j] =  Vec3f(ViewPort*Projection*ModelView*rotation*Matrix(v));
-                world_coords[j]  = v;
-                intensity[j] = model->norm(i, j)*light_dir;
-                uv[j] = model->uv(i, j);
-            }
-            triangle(screen_coords[0], screen_coords[1], screen_coords[2], intensity[0], intensity[1], intensity[2],  uv[0], uv[1], uv[2], image, zbuffer);
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
         }
-        image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-        image.write_tga_file("../output/render_gouraud6.tga");
+
+        window.clear(sf::Color::Black);
+
+        zbuffer = new int[width*height];
+
+        for (float angle = 0; angle < 360; angle += 10) {
+
+            TGAImage image(width, height, TGAImage::RGB);
+            for (int i = 0; i < width*height; i++) {
+                zbuffer[i] = std::numeric_limits<int>::min();
+            }
+
+            // Rotation around Y-axis
+            Matrix ModelView  = lookat(eye, center, Vec3f(0,1,0));
+            Matrix Projection = Matrix::identity(4);
+            Projection[3][2] = -1.f / (eye - center).norm();
+            Matrix ViewPort   = viewport(width/8, height/8, width*3/4, height*3/4);
+            Matrix Rotation   = rotationY(angle);
+
+            Matrix Transformation = ViewPort * Projection * ModelView * Rotation;
+
+            // Draw the model with the current rotation
+            // Assuming triangle() and other relevant functions are defined elsewhere
+            for (int i = 0; i < model->nfaces(); i++) {
+                // Similar loop to draw the model as before but using Transformation matrix
+                std::vector<int> face = model->face(i);
+                Vec3i screen_coords[3];
+                Vec3f world_coords[3];
+                float intensity[3];
+                Vec2i uv[3];
+                Vec3f current_light_dir = Vec3f(Transformation*Matrix(light_dir)).normalize();
+                for (int j=0; j<3; j++) {
+                    Vec3f v = model->vert(face[j]);
+                    screen_coords[j] =  Vec3f(Transformation*Matrix(v));
+                    world_coords[j]  = v;
+                    intensity[j] = Vec3f(Transformation*Matrix(model->norm(i, j))).normalize()*light_dir;
+                    uv[j] = model->uv(i, j);
+                }
+                triangle(screen_coords[0], screen_coords[1], screen_coords[2], intensity[0], intensity[1], intensity[2],  uv[0], uv[1], uv[2], image, zbuffer);
+            }
+            image.flip_vertically();
+
+            // Convert TGAImage to SFML texture
+            sf::Image sfImage;
+            sfImage.create(width, height, sf::Color::Black);
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    TGAColor col = image.get(x, y);
+                    sfImage.setPixel(x, y, sf::Color(col.bgra[2], col.bgra[1], col.bgra[0]));
+                }
+            }
+
+            texture.update(sfImage);
+            window.draw(sprite);
+            window.display();
+
+            std::this_thread::sleep_for(std::chrono::milliseconds (5)); // Sleep to slow down the rotation speed
+        }
+
+        delete[] zbuffer;
     }
+
     delete model;
-    delete [] zbuffer;
     return 0;
 }
